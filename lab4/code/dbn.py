@@ -62,18 +62,27 @@ class DeepBeliefNet():
         """
         
         n_samples = true_img.shape[0]
+        n_labels = true_lbl.shape[1]
         
-        vis = true_img # visible layer gets the image data
+        vis = true_img  # visible layer gets the image data
         
-        lbl = np.ones(true_lbl.shape)/10. # start the net by telling you know nothing about labels        
+        lbl = np.ones(true_lbl.shape)/10.  # start the net by telling you know nothing about labels
+
+        print("vis--hid")
+        hidOut = self.rbm_stack['vis--hid'].get_h_given_v_dir(vis)[1]
+
+        print("hid--pen")
+        penOut = self.rbm_stack['hid--pen'].get_h_given_v_dir(hidOut)[1]
+        penLblIn = np.concatenate((penOut, lbl), axis=1)
         
         for _ in range(self.n_gibbs_recog):
+            print("pen+lbl--top")
+            topOut = self.rbm_stack['pen+lbl--top'].get_h_given_v(penLblIn)[1]
+            penLblIn = self.rbm_stack['pen+lbl--top'].get_v_given_h(topOut)[1]
 
-            pass
-
-        predicted_lbl = np.zeros(true_lbl.shape)
+        predicted_lbl = penLblIn[:, -n_labels:]
             
-        print ("accuracy = %.2f%%"%(100.*np.mean(np.argmax(predicted_lbl,axis=1)==np.argmax(true_lbl,axis=1))))
+        print ("accuracy = %.2f%%" % (100.*np.mean(np.argmax(predicted_lbl,axis=1)==np.argmax(true_lbl,axis=1))))
         
         return
 
@@ -87,6 +96,7 @@ class DeepBeliefNet():
         """
         
         n_sample = true_lbl.shape[0]
+        n_labels = true_lbl.shape[1]
         
         records = []        
         fig,ax = plt.subplots(1,1,figsize=(3,3))#,constrained_layout=True)
@@ -94,10 +104,19 @@ class DeepBeliefNet():
         ax.set_xticks([]); ax.set_yticks([])
 
         lbl = true_lbl
-            
-        for _ in range(self.n_gibbs_gener):
+        random_img = np.random.randn(n_sample, self.sizes['pen'])
+        lblIn = np.concatenate((random_img, lbl), axis=1)
 
-            vis = np.random.rand(n_sample,self.sizes["vis"])
+        for _ in range(self.n_gibbs_gener):
+            lblOut = self.rbm_stack['pen+lbl--top'].get_h_given_v(lblIn)[1]
+            lblIn = self.rbm_stack['pen+lbl--top'].get_v_given_h(lblOut)[1]
+            lblIn[:, -n_labels:] = lbl[:,:]
+
+            pen = lblIn[:, :-n_labels]
+            hid = self.rbm_stack['hid--pen'].get_v_given_h_dir(pen)[1]
+            vis = self.rbm_stack['vis--hid'].get_v_given_h_dir(hid)[1]
+
+            # print(np.std(hid))
             
             records.append( [ ax.imshow(vis.reshape(self.image_size), cmap="bwr", vmin=0, vmax=1, animated=True, interpolation=None) ] )
             
@@ -133,14 +152,21 @@ class DeepBeliefNet():
             print ("training vis--hid")
             """ 
             CD-1 training for vis--hid 
-            """            
+            """
+            self.rbm_stack["vis--hid"].cd1(vis_trainset, n_iterations)
+
             self.savetofile_rbm(loc="trained_rbm",name="vis--hid")
 
             print ("training hid--pen")
-            self.rbm_stack["vis--hid"].untwine_weights()            
+            self.rbm_stack["vis--hid"].untwine_weights()
             """ 
             CD-1 training for hid--pen 
-            """            
+            """
+            # Get output from previous layer
+            hidOut = self.rbm_stack["vis--hid"].get_h_given_v_dir(vis_trainset)[1]
+            print(hidOut.shape)
+            self.rbm_stack["hid--pen"].cd1(hidOut, n_iterations)
+
             self.savetofile_rbm(loc="trained_rbm",name="hid--pen")            
 
             print ("training pen+lbl--top")
@@ -148,6 +174,11 @@ class DeepBeliefNet():
             """ 
             CD-1 training for pen+lbl--top 
             """
+            penOut = self.rbm_stack["hid--pen"].get_h_given_v_dir(hidOut)[1]
+            penOut = np.concatenate((penOut, lbl_trainset), axis=1)
+
+            self.rbm_stack["pen+lbl--top"].cd1(penOut, n_iterations)
+
             self.savetofile_rbm(loc="trained_rbm",name="pen+lbl--top")            
 
         return    
