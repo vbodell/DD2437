@@ -3,3 +3,13 @@
 */.jupyter/*
 
 .DS_Store
+
+# Images
+*.pdf
+*.png
+
+# Videos
+*.mp4
+
+*.pyc
+

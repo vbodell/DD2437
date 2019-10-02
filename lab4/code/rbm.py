@@ -76,16 +76,22 @@ class RestrictedBoltzmannMachine():
         """
 
         print ("learning CD1")
-        
+
+        MINBATCH_SIZE = 20
         n_samples = visible_trainset.shape[0]
 
         for it in range(n_iterations):
+            minibatch_ndx = int(n_iterations % (n_samples/MINBATCH_SIZE))
+            minibatch = visible_trainset[minibatch_ndx*MINBATCH_SIZE:(minibatch_ndx+1)*MINBATCH_SIZE, :]
 
             # positive phase
-            
+            hidProb, hid = self.get_h_given_v(minibatch)
+
             # negative phase
+            visProb, vis = self.get_v_given_h(hid)
 
             # updating parameters
+            self.update_params(minibatch, hid, vis, self.get_h_given_v(vis)[1])
             
             # visualize once in a while when visible layer is input images
             
@@ -96,8 +102,10 @@ class RestrictedBoltzmannMachine():
             # print progress
             
             if it % self.print_period == 0 :
+                hidProb, hid = self.get_h_given_v(visible_trainset)
+                visProb, vis = self.get_v_given_h(hid)
 
-                print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(visible_trainset - visible_trainset)))
+                print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(visible_trainset - vis)))
         
         return
     
@@ -117,7 +125,7 @@ class RestrictedBoltzmannMachine():
         """
 
         self.delta_bias_v += 0
-        self.delta_weight_vh += 0
+        self.delta_weight_vh = self.learning_rate*(np.dot(v_0.T, h_0) - np.dot(v_k.T, h_k))
         self.delta_bias_h += 0
         
         self.bias_v += self.delta_bias_v
@@ -142,8 +150,12 @@ class RestrictedBoltzmannMachine():
         assert self.weight_vh is not None
 
         n_samples = visible_minibatch.shape[0]
-        
-        return np.zeros((n_samples,self.ndim_hidden)), np.zeros((n_samples,self.ndim_hidden))
+
+        hidProb = sigmoid(self.bias_h + np.dot(visible_minibatch, self.weight_vh))
+        # hidProb = np.mean(hidProb, axis=1)
+        hid = np.where(hidProb >= np.random.random_sample(hidProb.shape), 1, 0)
+
+        return hidProb, hid
 
 
     def get_v_given_h(self,hidden_minibatch):
@@ -176,9 +188,10 @@ class RestrictedBoltzmannMachine():
             
         else:
                         
-            pass
+            visProb = sigmoid(self.bias_v + np.dot(hidden_minibatch, self.weight_vh.T))
+            vis = np.where(visProb >= np.random.random_sample(visProb.shape), np.ones(1), np.zeros(1))
             
-        return np.zeros((n_samples,self.ndim_visible)), np.zeros((n_samples,self.ndim_visible))
+        return visProb, vis
 
     
     """ rbm as a belief layer : the functions below do not have to be changed until running a deep belief net """

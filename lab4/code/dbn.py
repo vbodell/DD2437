@@ -250,4 +250,3 @@ class DeepBeliefNet():
         np.save("%s/dbn.%s.bias_v"%(loc,name),        self.rbm_stack[name].bias_v)
         np.save("%s/dbn.%s.bias_h"%(loc,name),        self.rbm_stack[name].bias_h)
         return
-    
