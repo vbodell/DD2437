@@ -94,6 +94,7 @@ class DeepBeliefNet():
           true_lbl: true labels shaped (number of samples, size of label layer)
           name: string used for saving a video of generated visible activations
         """
+        print('generate')
         
         n_sample = true_lbl.shape[0]
         n_labels = true_lbl.shape[1]
@@ -114,10 +115,9 @@ class DeepBeliefNet():
 
             pen = lblIn[:, :-n_labels]
             hid = self.rbm_stack['hid--pen'].get_v_given_h_dir(pen)[1]
-            vis = self.rbm_stack['vis--hid'].get_v_given_h_dir(hid)[1]
+            vis = self.rbm_stack['vis--hid'].get_v_given_h_dir(hid)[0]
 
-            # print(np.std(hid))
-            
+
             records.append( [ ax.imshow(vis.reshape(self.image_size), cmap="bwr", vmin=0, vmax=1, animated=True, interpolation=None) ] )
             
         anim = stitch_video(fig,records).save("%s.generate%d.mp4"%(name,np.argmax(true_lbl)))            
@@ -164,7 +164,6 @@ class DeepBeliefNet():
             """
             # Get output from previous layer
             hidOut = self.rbm_stack["vis--hid"].get_h_given_v_dir(vis_trainset)[1]
-            print(hidOut.shape)
             self.rbm_stack["hid--pen"].cd1(hidOut, n_iterations)
 
             self.savetofile_rbm(loc="trained_rbm",name="hid--pen")            

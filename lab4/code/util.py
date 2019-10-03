@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def print_stats(x):
+    print("mean={}, max={}, min={}, std={}".format(np.mean(x), np.max(x), np.min(x), np.std(x)))
+
 def sigmoid(support):
     
     """ 

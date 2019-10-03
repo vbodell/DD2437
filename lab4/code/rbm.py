@@ -77,13 +77,12 @@ class RestrictedBoltzmannMachine():
 
         print ("learning CD1")
 
-        MINBATCH_SIZE = 20
         n_samples = visible_trainset.shape[0]
 
         for it in range(n_iterations):
-            minibatch_ndx = int(n_iterations % (n_samples/MINBATCH_SIZE))
-            minibatch_end = min([(minibatch_ndx+1)*MINBATCH_SIZE, n_samples])
-            minibatch = visible_trainset[minibatch_ndx*MINBATCH_SIZE:minibatch_end, :]
+            minibatch_ndx = int(it % (n_samples/self.batch_size))
+            minibatch_end = min([(minibatch_ndx+1)*self.batch_size, n_samples])
+            minibatch = visible_trainset[minibatch_ndx*self.batch_size:minibatch_end, :]
 
             # positive phase
             hidProb, hid = self.get_h_given_v(minibatch)
@@ -125,9 +124,9 @@ class RestrictedBoltzmannMachine():
            all args have shape (size of mini-batch, size of respective layer)
         """
 
-        self.delta_bias_v += 0
+        self.delta_bias_v = self.learning_rate*(np.mean(v_0 - v_k, axis=0))
         self.delta_weight_vh = self.learning_rate*(np.dot(v_0.T, h_0) - np.dot(v_k.T, h_k))
-        self.delta_bias_h += 0
+        self.delta_bias_h = self.learning_rate*(np.mean(h_0 - h_k, axis=0))
         
         self.bias_v += self.delta_bias_v
         self.weight_vh += self.delta_weight_vh
@@ -185,15 +184,21 @@ class RestrictedBoltzmannMachine():
             """
 
             support = self.bias_v + np.dot(hidden_minibatch, self.weight_vh.T)
+            # Threshold support
+            support[support < -75] = -75
+
             visProb = sigmoid(support[:, :-self.n_labels])
             labProb = softmax(support[:, -self.n_labels:])
-            winners = [np.random.choice(np.arange(self.n_labels), p=labProb[ndx,:]) for ndx in range(n_samples)]
 
+            # print_stats(support)
+            # print_stats(labProb)
+            # winners = [np.random.choice(np.arange(self.n_labels), p=labProb[ndx,:]) for ndx in range(n_samples)]
+
+            # Get activiations
             vis = np.where(visProb >= np.random.random_sample(visProb.shape), np.ones(1), np.zeros(1))
-
-            vis = np.concatenate((vis, np.zeros((n_samples, self.n_labels))), axis=1)
-            for ndx, winner in enumerate(winners):
-                vis[ndx, -self.n_labels + winner] = 1
+            vis = np.concatenate((vis, sample_categorical(labProb)), axis=1)
+            # for ndx, winner in enumerate(winners):
+            #     vis[ndx, -self.n_labels + winner] = 1
 
         else:
                         
@@ -261,7 +266,6 @@ class RestrictedBoltzmannMachine():
             Then, for both parts, use the appropriate activation function to get probabilities and a sampling method \
             to get activities. The probabilities as well as activities can then be concatenated back into a normal visible layer.
             """
-            print("isTop")
             pass
             
         else:

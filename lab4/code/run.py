@@ -8,7 +8,7 @@ if __name__ == "__main__":
     train_imgs,train_lbls,test_imgs,test_lbls = read_mnist(dim=image_size, n_train=60000, n_test=10000)
 
     ITERATIONS = 30000
-    HIDDEN_NODES = 400
+    HIDDEN_NODES = 500
 
     # ''' restricted boltzmann machine '''
     #
@@ -20,36 +20,36 @@ if __name__ == "__main__":
     #                                  image_size=image_size,
     #                                  is_top=False,
     #                                  n_labels=10,
-    #                                  batch_size=10
+    #                                  batch_size=20
     # )
     #
     # print("Nodes={}, Iterations={}".format(HIDDEN_NODES, ITERATIONS))
     # rbm.cd1(visible_trainset=train_imgs, n_iterations=ITERATIONS)
-    #
-    # ''' deep- belief net '''
+
+    ''' deep- belief net '''
 
     print ("\nStarting a Deep Belief Net..")
     # print(train_lbls.shape)
     dbn = DeepBeliefNet(sizes={"vis":image_size[0]*image_size[1], "hid":500, "pen":500, "top":2000, "lbl":10},
                         image_size=image_size,
                         n_labels=10,
-                        batch_size=10
+                        batch_size=20
     )
 
     ''' greedy layer-wise training '''
 
-    dbn.train_greedylayerwise(vis_trainset=train_imgs, lbl_trainset=train_lbls, n_iterations=2000)
+    dbn.train_greedylayerwise(vis_trainset=train_imgs, lbl_trainset=train_lbls, n_iterations=12000)
 
     # dbn.recognize(train_imgs, train_lbls)
-    #
-    # dbn.recognize(test_imgs, test_lbls)
+
+    dbn.recognize(test_imgs, test_lbls)
 
     for digit in range(10):
         digit_1hot = np.zeros(shape=(1,10))
         digit_1hot[0,digit] = 1
         dbn.generate(digit_1hot, name="rbms")
-
-    ''' fine-tune wake-sleep training '''
+    #
+    # ''' fine-tune wake-sleep training '''
     #
     # dbn.train_wakesleep_finetune(vis_trainset=train_imgs, lbl_trainset=train_lbls, n_iterations=2000)
     #
