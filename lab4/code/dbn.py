@@ -105,8 +105,11 @@ class DeepBeliefNet():
         ax.set_xticks([]); ax.set_yticks([])
 
         lbl = true_lbl
-        random_img = np.random.randn(n_sample, self.sizes['pen'])
-        lblIn = np.concatenate((random_img, lbl), axis=1)
+        random_img = np.random.randn(n_sample, self.sizes['vis'])
+        hidOut = self.rbm_stack['vis--hid'].get_h_given_v_dir(random_img)[1]
+        penOut = self.rbm_stack['hid--pen'].get_h_given_v_dir(hidOut)[1]
+
+        lblIn = np.concatenate((penOut, lbl), axis=1)
 
         for _ in range(self.n_gibbs_gener):
             lblOut = self.rbm_stack['pen+lbl--top'].get_h_given_v(lblIn)[1]
@@ -115,7 +118,7 @@ class DeepBeliefNet():
 
             pen = lblIn[:, :-n_labels]
             hid = self.rbm_stack['hid--pen'].get_v_given_h_dir(pen)[1]
-            vis = self.rbm_stack['vis--hid'].get_v_given_h_dir(hid)[0]
+            vis = self.rbm_stack['vis--hid'].get_v_given_h_dir(hid)[1]
 
 
             records.append( [ ax.imshow(vis.reshape(self.image_size), cmap="bwr", vmin=0, vmax=1, animated=True, interpolation=None) ] )
@@ -145,7 +148,7 @@ class DeepBeliefNet():
             self.loadfromfile_rbm(loc="trained_rbm",name="hid--pen")
             self.rbm_stack["hid--pen"].untwine_weights()
             
-            self.loadfromfile_rbm(loc="trained_rbm",name="pen+lbl--top")        
+            self.loadfromfile_rbm(loc="trained_rbm",name="pen+lbl--top")
 
         except IOError :
         
@@ -166,7 +169,7 @@ class DeepBeliefNet():
             hidOut = self.rbm_stack["vis--hid"].get_h_given_v_dir(vis_trainset)[1]
             self.rbm_stack["hid--pen"].cd1(hidOut, n_iterations)
 
-            self.savetofile_rbm(loc="trained_rbm",name="hid--pen")            
+            self.savetofile_rbm(loc="trained_rbm",name="hid--pen")
 
             print ("training pen+lbl--top")
             self.rbm_stack["hid--pen"].untwine_weights()
@@ -178,7 +181,7 @@ class DeepBeliefNet():
 
             self.rbm_stack["pen+lbl--top"].cd1(penOut, n_iterations)
 
-            self.savetofile_rbm(loc="trained_rbm",name="pen+lbl--top")            
+            self.savetofile_rbm(loc="trained_rbm",name="pen+lbl--top")
 
         return    
 

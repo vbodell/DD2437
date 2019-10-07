@@ -152,7 +152,7 @@ class RestrictedBoltzmannMachine():
         n_samples = visible_minibatch.shape[0]
 
         hidProb = sigmoid(self.bias_h + np.dot(visible_minibatch, self.weight_vh))
-        hid = np.where(hidProb >= np.random.random_sample(hidProb.shape), 1, 0)
+        hid = sample_binary(hidProb)
 
         return hidProb, hid
 
@@ -195,7 +195,7 @@ class RestrictedBoltzmannMachine():
             # winners = [np.random.choice(np.arange(self.n_labels), p=labProb[ndx,:]) for ndx in range(n_samples)]
 
             # Get activiations
-            vis = np.where(visProb >= np.random.random_sample(visProb.shape), np.ones(1), np.zeros(1))
+            vis = sample_binary(visProb)
             vis = np.concatenate((vis, sample_categorical(labProb)), axis=1)
             # for ndx, winner in enumerate(winners):
             #     vis[ndx, -self.n_labels + winner] = 1
@@ -203,7 +203,7 @@ class RestrictedBoltzmannMachine():
         else:
                         
             visProb = sigmoid(self.bias_v + np.dot(hidden_minibatch, self.weight_vh.T))
-            vis = np.where(visProb >= np.random.random_sample(visProb.shape), np.ones(1), np.zeros(1))
+            vis = sample_binary(visProb)
             
         return visProb, vis
 
@@ -235,7 +235,7 @@ class RestrictedBoltzmannMachine():
         n_samples = visible_minibatch.shape[0]
 
         hidProb = sigmoid(self.bias_h + np.dot(visible_minibatch, self.weight_v_to_h))
-        hid = np.where(hidProb >= np.random.random_sample(hidProb.shape), 1, 0)
+        hid = sample_binary(hidProb)
 
         return hidProb, hid
 
@@ -271,7 +271,7 @@ class RestrictedBoltzmannMachine():
         else:
 
             visProb = sigmoid(self.bias_v + np.dot(hidden_minibatch, self.weight_h_to_v))
-            vis = np.where(visProb >= np.random.random_sample(visProb.shape), np.ones(1), np.zeros(1))
+            vis = sample_binary(visProb)
             
         return visProb, vis
         
