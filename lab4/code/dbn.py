@@ -48,7 +48,7 @@ class DeepBeliefNet():
         
         self.n_gibbs_wakesleep = 5
 
-        self.print_period = 2000
+        self.print_period = 1000
         
         return
 
@@ -208,40 +208,97 @@ class DeepBeliefNet():
         except IOError :            
 
             self.n_samples = vis_trainset.shape[0]
+            n_labels = lbl_trainset.shape[1]
             
-            for it in range(n_iterations):            
+            for it in range(n_iterations):
+
+                # Get batch
+                minibatch_ndx = int(it % (self.n_samples / self.batch_size))
+                minibatch_end = min([(minibatch_ndx + 1) * self.batch_size, self.n_samples])
+                vis_minibatch = vis_trainset[minibatch_ndx * self.batch_size:minibatch_end, :]
+                lbl_minibatch = lbl_trainset[minibatch_ndx * self.batch_size:minibatch_end, :]
                                 
                 """ 
                 wake-phase : drive the network bottom-to-top using visible and label data
                 """
 
+                # \% PERFORM A BOTTOM-UP PASS TO GET WAKE/POSITIVE PHASE PROBABILITIES
+                # \% AND SAMPLE STATES
+                # wakehidprobs = logistic(data*vishid + hidrecbiases);
+                # wakehidstates = wakehidprobs > rand(1, numhid);
+                # wakepenprobs = logistic(wakehidstates*hidpen + penrecbiases);
+                # wakepenstates = wakepenprobs > rand(1, numpen);
+                # postopprobs = logistic(wakepenstates*pentop + targets*labtop + topbiases);
+                # postopstates = waketopprobs > rand(1, numtop));
+
+                wakehidprobs, wakehidstates = self.rbm_stack['vis--hid'].get_h_given_v_dir(vis_minibatch)
+                wakepenprobs, wakepenstates = self.rbm_stack['hid--pen'].get_h_given_v_dir(wakehidstates)
+                waketopprobs, waketopstates = self.rbm_stack['pen+lbl--top'].get_h_given_v(
+                    np.concatenate((wakepenstates, lbl_minibatch), axis=1))
+
                 """
                 alternating Gibbs sampling in the top RBM : also store neccessary information for learning this RBM
                 """
+                # Initialize loop
+                negtopstates = waketopstates
+                for _ in range(self.n_gibbs_wakesleep):
+                    negpenprobs, negpenstates = self.rbm_stack['pen+lbl--top'].get_v_given_h(negtopstates)
+                    negtopprobs, negtopstates = self.rbm_stack['pen+lbl--top'].get_h_given_v(negpenstates)
 
                 """
                 sleep phase : from the activities in the top RBM, drive the network top-to-bottom
                 """
+                # sleeppenstates = negpenstates;
+                # sleephidprobs = logistic(sleeppenstates * penhid + hidgenbiases);
+                # sleephidstates = sleephidprobs > rand(1, numhid);
+                # sleepvisprobs = logistic(sleephidstates * hidvis + visgenbiases);
+
+                sleeppenstates = negpenstates[:, :-n_labels]
+                sleephidprobs, sleephidstates = self.rbm_stack['hid--pen'].get_v_given_h_dir(sleeppenstates)
+                sleepvisprobs, sleepvisstates = self.rbm_stack['vis--hid'].get_v_given_h_dir(sleephidstates)
 
                 """
                 predictions : compute generative predictions from wake-phase activations, 
                               and recognize predictions from sleep-phase activations
                 """
+                # \ % PREDICTIONS
+                # psleeppenstates = logistic(sleephidstates * hidpen + penrecbiases);
+                # psleephidstates = logistic(sleepvisprobs * vishid + hidrecbiases);
+                # pvisprobs = logistic(wakehidstates * hidvis + visgenbiases);
+                # phidprobs = logistic(wakepenstates * penhid + hidgenbiases);
+
+                predsleeppenprobs = self.rbm_stack['hid--pen'].get_h_given_v_dir(sleephidstates)[1]
+                predsleephidprobs = self.rbm_stack['vis--hid'].get_h_given_v_dir(sleepvisprobs)[1]
+                predvisprobs = self.rbm_stack['vis--hid'].get_v_given_h_dir(wakehidstates)[0]
+                predhidprobs = self.rbm_stack['hid--pen'].get_v_given_h_dir(wakepenstates)[1]
+
                 
                 """ 
                 update generative parameters :
                 here you will only use "update_generate_params" method from rbm class
                 """
+                self.rbm_stack['vis--hid'].update_generate_params(inps=wakehidstates, trgs=vis_minibatch,
+                                                                  preds=predvisprobs)
+                self.rbm_stack['hid--pen'].update_generate_params(inps=wakepenstates, trgs=wakehidstates,
+                                                                  preds=predhidprobs)
 
                 """ 
                 update parameters of top rbm:
                 here you will only use "update_params" method from rbm class
                 """
-                
+                self.rbm_stack['pen+lbl--top'].update_params(np.concatenate((wakepenstates, lbl_minibatch), axis=1),
+                                                             waketopstates,
+                                                             negpenstates,
+                                                             negtopstates)
+
                 """ 
                 update generative parameters :
                 here you will only use "update_recognize_params" method from rbm class
                 """
+                self.rbm_stack['hid--pen'].update_recognize_params(inps=sleephidstates, trgs=sleeppenstates,
+                                                                   preds=predsleeppenprobs)
+                self.rbm_stack['vis--hid'].update_recognize_params(inps=sleepvisprobs, trgs=sleephidstates,
+                                                                   preds=predsleephidprobs)
 
                 if it % self.print_period == 0 : print ("iteration=%7d"%it)
                         

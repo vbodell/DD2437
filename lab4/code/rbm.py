@@ -91,7 +91,7 @@ class RestrictedBoltzmannMachine():
             visProb, vis = self.get_v_given_h(hid)
 
             # updating parameters
-            self.update_params(minibatch, hid, vis, self.get_h_given_v(vis)[1])
+            self.update_params(minibatch, hid, vis, self.get_h_given_v(vis)[0])
             
             # visualize once in a while when visible layer is input images
             
@@ -197,6 +197,7 @@ class RestrictedBoltzmannMachine():
             # Get activiations
             vis = sample_binary(visProb)
             vis = np.concatenate((vis, sample_categorical(labProb)), axis=1)
+            visProb = np.concatenate((visProb, labProb), axis=1)
             # for ndx, winner in enumerate(winners):
             #     vis[ndx, -self.n_labels + winner] = 1
 
@@ -286,8 +287,8 @@ class RestrictedBoltzmannMachine():
            all args have shape (size of mini-batch, size of respective layer)
         """
 
-        self.delta_weight_h_to_v += 0
-        self.delta_bias_v += 0
+        self.delta_weight_h_to_v = self.learning_rate * (inps.T.dot(trgs - preds))
+        self.delta_bias_v = self.learning_rate * np.mean(trgs - preds, axis=0)
         
         self.weight_h_to_v += self.delta_weight_h_to_v
         self.bias_v += self.delta_bias_v 
@@ -305,8 +306,8 @@ class RestrictedBoltzmannMachine():
            all args have shape (size of mini-batch, size of respective layer)
         """
 
-        self.delta_weight_v_to_h += 0
-        self.delta_bias_h += 0
+        self.delta_weight_v_to_h = self.learning_rate * (inps.T.dot(trgs - preds))
+        self.delta_bias_h = self.learning_rate * np.mean(trgs - preds, axis=0)
 
         self.weight_v_to_h += self.delta_weight_v_to_h
         self.bias_h += self.delta_bias_h
